@@ -224,6 +224,79 @@ class Panel(UIElement):
         for element in self.elements:
             element.draw(surface)
 
+class InspectorPanel(Panel):
+    """Inspector panel that shows properties of selected objects"""
+    def __init__(self, x, y, width, height, scene):
+        super().__init__(x, y, width, height, "Inspector")
+        self.scene = scene
+        self.font = pygame.font.Font(None, 18)
+        self.small_font = pygame.font.Font(None, 16)
+        
+    def draw(self, surface):
+        # Draw panel background and title
+        super().draw(surface)
+        
+        # Check if we have a selected object
+        if self.scene.selected_object:
+            self.draw_object_inspector(surface, self.scene.selected_object)
+        else:
+            self.draw_no_selection(surface)
+            
+    def draw_no_selection(self, surface):
+        """Draw message when no object is selected"""
+        text = self.font.render("No object selected", True, (120, 120, 120))
+        surface.blit(text, (self.rect.x + 15, self.rect.y + 50))
+        
+    def draw_object_inspector(self, surface, game_object):
+        """Draw inspector for the selected game object"""
+        y_offset = 50
+        line_height = 25
+        
+        # Object name
+        name_text = self.font.render(f"Name: {game_object.name}", True, TEXT_COLOR)
+        surface.blit(name_text, (self.rect.x + 15, self.rect.y + y_offset))
+        y_offset += line_height + 10
+        
+        # Transform section header
+        transform_header = self.font.render("Transform", True, ACCENT_COLOR)
+        surface.blit(transform_header, (self.rect.x + 15, self.rect.y + y_offset))
+        y_offset += line_height
+        
+        # Draw separator line
+        pygame.draw.line(surface, BORDER_COLOR, 
+                        (self.rect.x + 15, self.rect.y + y_offset - 5),
+                        (self.rect.x + self.rect.width - 15, self.rect.y + y_offset - 5))
+        
+        # Position
+        pos_text = self.small_font.render("Position:", True, TEXT_COLOR)
+        surface.blit(pos_text, (self.rect.x + 20, self.rect.y + y_offset))
+        y_offset += 20
+        
+        pos_x_text = self.small_font.render(f"X: {game_object.transform.position.x:.1f}", True, (200, 200, 200))
+        pos_y_text = self.small_font.render(f"Y: {game_object.transform.position.y:.1f}", True, (200, 200, 200))
+        surface.blit(pos_x_text, (self.rect.x + 25, self.rect.y + y_offset))
+        surface.blit(pos_y_text, (self.rect.x + 140, self.rect.y + y_offset))
+        y_offset += line_height
+        
+        # Rotation
+        rot_text = self.small_font.render("Rotation:", True, TEXT_COLOR)
+        surface.blit(rot_text, (self.rect.x + 20, self.rect.y + y_offset))
+        y_offset += 20
+        
+        rot_value_text = self.small_font.render(f"Z: {game_object.transform.rotation:.1f}°", True, (200, 200, 200))
+        surface.blit(rot_value_text, (self.rect.x + 25, self.rect.y + y_offset))
+        y_offset += line_height
+        
+        # Scale
+        scale_text = self.small_font.render("Scale:", True, TEXT_COLOR)
+        surface.blit(scale_text, (self.rect.x + 20, self.rect.y + y_offset))
+        y_offset += 20
+        
+        scale_x_text = self.small_font.render(f"X: {game_object.transform.scale.x:.2f}", True, (200, 200, 200))
+        scale_y_text = self.small_font.render(f"Y: {game_object.transform.scale.y:.2f}", True, (200, 200, 200))
+        surface.blit(scale_x_text, (self.rect.x + 25, self.rect.y + y_offset))
+        surface.blit(scale_y_text, (self.rect.x + 140, self.rect.y + y_offset))
+
 class Console:
     """Console system for displaying messages"""
     def __init__(self):
@@ -445,8 +518,8 @@ class PygameEditor:
         inspector_y = MENU_HEIGHT
         inspector_width = INSPECTOR_WIDTH
         inspector_height = SCREEN_HEIGHT - MENU_HEIGHT - CONSOLE_HEIGHT
-        self.inspector_panel = Panel(inspector_x, inspector_y, inspector_width, 
-                                   inspector_height, "Inspector")
+        self.inspector_panel = InspectorPanel(inspector_x, inspector_y, inspector_width, 
+                                            inspector_height, self.scene)
         
         # Console Panel
         self.console_panel = ConsolePanel(0, SCREEN_HEIGHT - CONSOLE_HEIGHT, 
