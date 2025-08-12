@@ -657,103 +657,6 @@ class DragLabel:
         text_rect.center = self.rect.center
         surface.blit(text_surface, text_rect)
 
-class DragField:
-    """Draggable value field for the inspector"""
-    def __init__(self, x, y, width, height, label, game_object, property_path, step=1.0):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.label = label
-        self.game_object = game_object
-        self.property_path = property_path  # e.g., "transform.position.x"
-        self.step = step
-        self.is_dragging = False
-        self.drag_start_x = 0
-        self.drag_start_value = 0.0
-        self.hovered = False
-        
-    def get_value(self):
-        """Get value using property path"""
-        try:
-            obj = self.game_object
-            for prop in self.property_path.split('.'):
-                obj = getattr(obj, prop)
-            return obj
-        except:
-            return 0.0
-            
-    def set_value(self, value):
-        """Set value using property path"""
-        try:
-            obj = self.game_object
-            props = self.property_path.split('.')
-            for prop in props[:-1]:
-                obj = getattr(obj, prop)
-            setattr(obj, props[-1], value)
-        except Exception as e:
-            print(f"Error setting {self.property_path} to {value}: {e}")
-        
-    def handle_event(self, event, mouse_pos):
-        self.hovered = self.rect.collidepoint(mouse_pos)
-        
-        if event.type == pygame.MOUSEBUTTONDOWN and self.hovered:
-            if event.button == 1:  # Left click
-                # Store initial state when drag starts
-                self.is_dragging = True
-                self.drag_start_x = mouse_pos[0]
-                self.drag_start_value = self.get_value()
-                return True
-                
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1 and self.is_dragging:
-                self.is_dragging = False
-                
-        elif event.type == pygame.MOUSEMOTION and self.is_dragging:
-            # Calculate total distance from start
-            total_distance = mouse_pos[0] - self.drag_start_x
-            # Convert distance to value change
-            value_change = total_distance * self.step
-            # Apply to original value
-            new_value = self.drag_start_value + value_change
-            
-            # Hard limits for scale values
-            if "scale" in self.property_path.lower():
-                new_value = max(0.01, new_value)  # Minimum scale of 0.01
-            
-            self.set_value(new_value)
-            return True
-            
-        return False
-        
-    def draw(self, surface):
-        # Draw background box like Unity
-        box_color = (60, 60, 60)  # Dark gray background
-        border_color = (100, 100, 100)  # Lighter border
-        
-        if self.is_dragging:
-            border_color = (150, 150, 255)  # Blue border when dragging
-        elif self.hovered:
-            border_color = (120, 120, 120)  # Lighter border when hovered
-            
-        # Draw the box
-        pygame.draw.rect(surface, box_color, self.rect)
-        pygame.draw.rect(surface, border_color, self.rect, 1)
-        
-        # Draw the value text centered in the box
-        font = pygame.font.Font(None, 16)
-        text_color = (255, 255, 255)  # White text
-            
-        # Format value
-        if self.label == "Rotation":
-            value_text = f"{self.get_value():.1f}"
-        else:
-            value_text = f"{self.get_value():.1f}"
-            
-        text_surface = font.render(value_text, True, text_color)
-        
-        # Center the text in the box
-        text_x = self.rect.x + (self.rect.width - text_surface.get_width()) // 2
-        text_y = self.rect.y + (self.rect.height - text_surface.get_height()) // 2
-        surface.blit(text_surface, (text_x, text_y))
-
 
 class InspectorPanel(Panel):
     """Inspector panel that shows properties of selected objects"""
@@ -1104,7 +1007,7 @@ class SceneView(UIElement):
         self.surface = pygame.Surface((width, height))
         self.scene = scene
         self.camera = EditorCamera(width, height)
-        self.grid_size = 20
+
         self.show_grid = True
         self.show_origin = True
         
