@@ -90,6 +90,11 @@ class SceneView:
         self.last_mouse_pos = Vector2(0, 0)
         self.hovered = False
         
+        # Drag and drop state
+        self.is_dragging_object = False
+        self.dragged_object = None
+        self.drag_start_pos = Vector2(0, 0)
+        
     def handle_event(self, event):
         if not self.hovered:
             return False
@@ -111,10 +116,17 @@ class SceneView:
                     self.camera.reset_view()
                     return True
                 
-                # Object selection (existing functionality)
+                # Object selection and drag start
                 world_pos = self.camera.screen_to_world(local_mouse_pos)
                 clicked_object = self.scene.get_object_at_position(world_pos.x, world_pos.y)
                 self.scene.select_object(clicked_object)
+                
+                # Start dragging if we clicked on an object
+                if clicked_object:
+                    self.is_dragging_object = True
+                    self.dragged_object = clicked_object
+                    self.drag_start_pos = world_pos
+                
                 return True
             elif event.button == 2:  # Middle click - start panning
                 self.is_panning = True
@@ -122,17 +134,28 @@ class SceneView:
                 return True
                 
         elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 2:  # Middle click release - stop panning
+            if event.button == 1:  # Left click release - stop dragging
+                if self.is_dragging_object:
+                    self.is_dragging_object = False
+                    self.dragged_object = None
+                    return True
+            elif event.button == 2:  # Middle click release - stop panning
                 self.is_panning = False
                 return True
                 
-        elif event.type == pygame.MOUSEMOTION and self.is_panning:
-            # Pan the camera
-            delta_x = local_mouse_pos.x - self.last_mouse_pos.x
-            delta_y = local_mouse_pos.y - self.last_mouse_pos.y
-            self.camera.pan(delta_x, delta_y)
-            self.last_mouse_pos = local_mouse_pos
-            return True
+        elif event.type == pygame.MOUSEMOTION:
+            if self.is_panning:
+                # Pan the camera
+                delta_x = local_mouse_pos.x - self.last_mouse_pos.x
+                delta_y = local_mouse_pos.y - self.last_mouse_pos.y
+                self.camera.pan(delta_x, delta_y)
+                self.last_mouse_pos = local_mouse_pos
+                return True
+            elif self.is_dragging_object and self.dragged_object:
+                # Drag the object
+                world_pos = self.camera.screen_to_world(local_mouse_pos)
+                self.dragged_object.transform.position = world_pos
+                return True
             
         elif event.type == pygame.MOUSEWHEEL and self.hovered:
             # Zoom at mouse position
@@ -169,6 +192,11 @@ class SceneView:
         # This fixes the issue where releasing MMB outside the scene view doesn't stop panning
         if self.is_panning and not pygame.mouse.get_pressed()[1]:  # Index 1 is middle mouse button
             self.is_panning = False
+        
+        # Check if left mouse button is still pressed globally (for dragging)
+        if self.is_dragging_object and not pygame.mouse.get_pressed()[0]:  # Index 0 is left mouse button
+            self.is_dragging_object = False
+            self.dragged_object = None
     
     def draw(self, surface):
         # Clear scene surface
@@ -313,6 +341,12 @@ class SceneView:
                     )
                     pygame.draw.ellipse(self.surface, Colors.SELECTION_COLOR, selection_rect, 2)
                 
+                # Choose object color based on state
+                if self.is_dragging_object and obj == self.dragged_object:
+                    object_color = (255, 200, 100)  # Orange when dragging
+                else:
+                    object_color = Colors.ACCENT_COLOR  # Normal color
+                
                 # Draw the object as ellipse (proper X/Y scaling)
                 object_rect = pygame.Rect(
                     int(screen_pos.x - scaled_width/2), 
@@ -320,7 +354,7 @@ class SceneView:
                     scaled_width, 
                     scaled_height
                 )
-                pygame.draw.ellipse(self.surface, Colors.ACCENT_COLOR, object_rect)
+                pygame.draw.ellipse(self.surface, object_color, object_rect)
                 
                 # Draw name (only if zoom is high enough)
                 if self.camera.zoom >= 0.5:

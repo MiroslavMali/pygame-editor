@@ -1,0 +1,3 @@
+[33mbe1be8f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m)[m Fix camera panning bug: stop panning when MMB released outside scene view
+[33mcd578fd[m[33m ([m[1;31morigin/dev[m[33m)[m Add click-to-reset functionality for zoom and camera position
+[33m8391bb9[m Restructure code into modular architecture
