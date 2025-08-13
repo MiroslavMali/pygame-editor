@@ -499,7 +499,7 @@ class InspectorPanel(Panel):
             )
             self.input_fields.append(rot_field)
             
-            # Scale fields - right next to X and Y labels
+            # Scale fields - right next to X and Y scale labels
             scale_y = rot_y + row_height
             scale_x_field = TextInput(
                 self.rect.x + 130, scale_y,  # Right after X label
@@ -555,6 +555,34 @@ class InspectorPanel(Panel):
                 self.on_value_change, "transform.scale.y", self.scene, step=0.01
             )
             self.drag_labels.append(scale_y_label)
+        
+        # Update existing input field values to reflect current object properties
+        if self.scene.selected_object and self.input_fields:
+            obj = self.scene.selected_object
+            
+            # Update position fields
+            if len(self.input_fields) >= 2:
+                if not self.input_fields[0].is_active:  # Only update if not being edited
+                    self.input_fields[0].display_value = f"{obj.transform.position.x:.2f}"
+                    self.input_fields[0].value = self.input_fields[0].display_value
+                if not self.input_fields[1].is_active:  # Only update if not being edited
+                    self.input_fields[1].display_value = f"{obj.transform.position.y:.2f}"
+                    self.input_fields[1].value = self.input_fields[1].display_value
+            
+            # Update rotation field
+            if len(self.input_fields) >= 3:
+                if not self.input_fields[2].is_active:  # Only update if not being edited
+                    self.input_fields[2].display_value = f"{obj.transform.rotation:.2f}"
+                    self.input_fields[2].value = self.input_fields[2].display_value
+            
+            # Update scale fields
+            if len(self.input_fields) >= 5:
+                if not self.input_fields[3].is_active:  # Only update if not being edited
+                    self.input_fields[3].display_value = f"{obj.transform.scale.x:.2f}"
+                    self.input_fields[3].value = self.input_fields[3].display_value
+                if not self.input_fields[4].is_active:  # Only update if not being edited
+                    self.input_fields[4].display_value = f"{obj.transform.scale.y:.2f}"
+                    self.input_fields[4].value = self.input_fields[4].display_value
 
     def draw(self, surface):
         # Draw panel background and title

@@ -1,4 +1,3 @@
-[33me068bd0[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m Update pygame editor with latest improvements
-[33m6c1d085[m Add dual input system: draggable labels + text inputs
-[33me707d9c[m Add Unity-style Inspector panel with Transform properties display
-[33m7e0f16d[m[33m ([m[1;32mmain[m[33m)[m Initial commit: Pygame Editor with hierarchy, scene view, and inspector
+[33mbe1be8f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m)[m Fix camera panning bug: stop panning when MMB released outside scene view
+[33mcd578fd[m[33m ([m[1;31morigin/dev[m[33m)[m Add click-to-reset functionality for zoom and camera position
+[33m8391bb9[m Restructure code into modular architecture

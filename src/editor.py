@@ -69,6 +69,10 @@ class EditorCamera:
         """Reset camera to origin with normal zoom"""
         self.position = Vector2(0, 0)
         self.zoom = 1.0
+    
+    def reset_zoom(self):
+        """Reset zoom to 1.0 while keeping camera position"""
+        self.zoom = 1.0
 
 class SceneView:
     """Main scene view where the game is rendered"""
@@ -86,6 +90,11 @@ class SceneView:
         self.last_mouse_pos = Vector2(0, 0)
         self.hovered = False
         
+        # Drag and drop state
+        self.is_dragging_object = False
+        self.dragged_object = None
+        self.drag_start_pos = Vector2(0, 0)
+        
     def handle_event(self, event):
         if not self.hovered:
             return False
@@ -96,11 +105,28 @@ class SceneView:
         local_mouse_pos = Vector2(local_mouse_x, local_mouse_y)
         
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left click - object selection
-                # Convert screen coordinates to world coordinates
+            if event.button == 1:  # Left click
+                # Check if clicking on zoom text
+                if self.is_click_on_zoom_text(local_mouse_pos):
+                    self.camera.reset_zoom()
+                    return True
+                
+                # Check if clicking on camera position text
+                if self.is_click_on_camera_text(local_mouse_pos):
+                    self.camera.reset_view()
+                    return True
+                
+                # Object selection and drag start
                 world_pos = self.camera.screen_to_world(local_mouse_pos)
                 clicked_object = self.scene.get_object_at_position(world_pos.x, world_pos.y)
                 self.scene.select_object(clicked_object)
+                
+                # Start dragging if we clicked on an object
+                if clicked_object:
+                    self.is_dragging_object = True
+                    self.dragged_object = clicked_object
+                    self.drag_start_pos = world_pos
+                
                 return True
             elif event.button == 2:  # Middle click - start panning
                 self.is_panning = True
@@ -108,17 +134,28 @@ class SceneView:
                 return True
                 
         elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 2:  # Middle click release - stop panning
+            if event.button == 1:  # Left click release - stop dragging
+                if self.is_dragging_object:
+                    self.is_dragging_object = False
+                    self.dragged_object = None
+                    return True
+            elif event.button == 2:  # Middle click release - stop panning
                 self.is_panning = False
                 return True
                 
-        elif event.type == pygame.MOUSEMOTION and self.is_panning:
-            # Pan the camera
-            delta_x = local_mouse_pos.x - self.last_mouse_pos.x
-            delta_y = local_mouse_pos.y - self.last_mouse_pos.y
-            self.camera.pan(delta_x, delta_y)
-            self.last_mouse_pos = local_mouse_pos
-            return True
+        elif event.type == pygame.MOUSEMOTION:
+            if self.is_panning:
+                # Pan the camera
+                delta_x = local_mouse_pos.x - self.last_mouse_pos.x
+                delta_y = local_mouse_pos.y - self.last_mouse_pos.y
+                self.camera.pan(delta_x, delta_y)
+                self.last_mouse_pos = local_mouse_pos
+                return True
+            elif self.is_dragging_object and self.dragged_object:
+                # Drag the object
+                world_pos = self.camera.screen_to_world(local_mouse_pos)
+                self.dragged_object.transform.position = world_pos
+                return True
             
         elif event.type == pygame.MOUSEWHEEL and self.hovered:
             # Zoom at mouse position
@@ -128,9 +165,39 @@ class SceneView:
             
         return False
     
+    def is_click_on_zoom_text(self, local_mouse_pos):
+        """Check if mouse click is on the zoom text overlay"""
+        font = pygame.font.Font(None, 20)
+        zoom_text = f"Zoom: {self.camera.zoom:.1f}x"
+        zoom_surface = font.render(zoom_text, True, Colors.TEXT_COLOR)
+        
+        # Create a rectangle for the zoom text area
+        zoom_rect = pygame.Rect(10, 10, zoom_surface.get_width(), zoom_surface.get_height())
+        return zoom_rect.collidepoint(local_mouse_pos.x, local_mouse_pos.y)
+    
+    def is_click_on_camera_text(self, local_mouse_pos):
+        """Check if mouse click is on the camera position text overlay"""
+        font = pygame.font.Font(None, 20)
+        pos_text = f"Camera: ({self.camera.position.x:.1f}, {self.camera.position.y:.1f})"
+        pos_surface = font.render(pos_text, True, Colors.TEXT_COLOR)
+        
+        # Create a rectangle for the camera text area
+        camera_rect = pygame.Rect(10, 30, pos_surface.get_width(), pos_surface.get_height())
+        return camera_rect.collidepoint(local_mouse_pos.x, local_mouse_pos.y)
+    
     def update(self, mouse_pos):
         self.hovered = self.rect.collidepoint(mouse_pos)
         
+        # Check if middle mouse button is still pressed globally
+        # This fixes the issue where releasing MMB outside the scene view doesn't stop panning
+        if self.is_panning and not pygame.mouse.get_pressed()[1]:  # Index 1 is middle mouse button
+            self.is_panning = False
+        
+        # Check if left mouse button is still pressed globally (for dragging)
+        if self.is_dragging_object and not pygame.mouse.get_pressed()[0]:  # Index 0 is left mouse button
+            self.is_dragging_object = False
+            self.dragged_object = None
+    
     def draw(self, surface):
         # Clear scene surface
         self.surface.fill(Colors.DARK_GRAY)
@@ -274,6 +341,12 @@ class SceneView:
                     )
                     pygame.draw.ellipse(self.surface, Colors.SELECTION_COLOR, selection_rect, 2)
                 
+                # Choose object color based on state
+                if self.is_dragging_object and obj == self.dragged_object:
+                    object_color = (255, 200, 100)  # Orange when dragging
+                else:
+                    object_color = Colors.ACCENT_COLOR  # Normal color
+                
                 # Draw the object as ellipse (proper X/Y scaling)
                 object_rect = pygame.Rect(
                     int(screen_pos.x - scaled_width/2), 
@@ -281,7 +354,7 @@ class SceneView:
                     scaled_width, 
                     scaled_height
                 )
-                pygame.draw.ellipse(self.surface, Colors.ACCENT_COLOR, object_rect)
+                pygame.draw.ellipse(self.surface, object_color, object_rect)
                 
                 # Draw name (only if zoom is high enough)
                 if self.camera.zoom >= 0.5:
@@ -296,15 +369,46 @@ class SceneView:
         """Draw UI overlays like zoom level and coordinates"""
         font = pygame.font.Font(None, 20)
         
+        # Get current mouse position for hover detection
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        local_mouse_x = mouse_x - self.rect.x
+        local_mouse_y = mouse_y - self.rect.y
+        
         # Zoom level
         zoom_text = f"Zoom: {self.camera.zoom:.1f}x"
         zoom_surface = font.render(zoom_text, True, Colors.TEXT_COLOR)
+        
+        # Check if hovering over zoom text
+        zoom_rect = pygame.Rect(10, 10, zoom_surface.get_width(), zoom_surface.get_height())
+        zoom_hovered = zoom_rect.collidepoint(local_mouse_x, local_mouse_y)
+        
+        # Draw zoom text with hover effect
+        zoom_color = Colors.ACCENT_COLOR if zoom_hovered else Colors.TEXT_COLOR
+        zoom_surface = font.render(zoom_text, True, zoom_color)
         self.surface.blit(zoom_surface, (10, 10))
+        
+        # Add underline if hovered
+        if zoom_hovered:
+            pygame.draw.line(self.surface, zoom_color, (10, 10 + zoom_surface.get_height()), 
+                           (10 + zoom_surface.get_width(), 10 + zoom_surface.get_height()), 1)
         
         # Camera position
         pos_text = f"Camera: ({self.camera.position.x:.1f}, {self.camera.position.y:.1f})"
         pos_surface = font.render(pos_text, True, Colors.TEXT_COLOR)
+        
+        # Check if hovering over camera text
+        camera_rect = pygame.Rect(10, 30, pos_surface.get_width(), pos_surface.get_height())
+        camera_hovered = camera_rect.collidepoint(local_mouse_x, local_mouse_y)
+        
+        # Draw camera text with hover effect
+        camera_color = Colors.ACCENT_COLOR if camera_hovered else Colors.TEXT_COLOR
+        pos_surface = font.render(pos_text, True, camera_color)
         self.surface.blit(pos_surface, (10, 30))
+        
+        # Add underline if hovered
+        if camera_hovered:
+            pygame.draw.line(self.surface, camera_color, (10, 30 + pos_surface.get_height()), 
+                           (10 + pos_surface.get_width(), 30 + pos_surface.get_height()), 1)
 
 class PygameEditor:
     """Main editor class"""
