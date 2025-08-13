@@ -69,6 +69,10 @@ class EditorCamera:
         """Reset camera to origin with normal zoom"""
         self.position = Vector2(0, 0)
         self.zoom = 1.0
+    
+    def reset_zoom(self):
+        """Reset zoom to 1.0 while keeping camera position"""
+        self.zoom = 1.0
 
 class SceneView:
     """Main scene view where the game is rendered"""
@@ -96,8 +100,18 @@ class SceneView:
         local_mouse_pos = Vector2(local_mouse_x, local_mouse_y)
         
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left click - object selection
-                # Convert screen coordinates to world coordinates
+            if event.button == 1:  # Left click
+                # Check if clicking on zoom text
+                if self.is_click_on_zoom_text(local_mouse_pos):
+                    self.camera.reset_zoom()
+                    return True
+                
+                # Check if clicking on camera position text
+                if self.is_click_on_camera_text(local_mouse_pos):
+                    self.camera.reset_view()
+                    return True
+                
+                # Object selection (existing functionality)
                 world_pos = self.camera.screen_to_world(local_mouse_pos)
                 clicked_object = self.scene.get_object_at_position(world_pos.x, world_pos.y)
                 self.scene.select_object(clicked_object)
@@ -127,6 +141,26 @@ class SceneView:
             return True
             
         return False
+    
+    def is_click_on_zoom_text(self, local_mouse_pos):
+        """Check if mouse click is on the zoom text overlay"""
+        font = pygame.font.Font(None, 20)
+        zoom_text = f"Zoom: {self.camera.zoom:.1f}x"
+        zoom_surface = font.render(zoom_text, True, Colors.TEXT_COLOR)
+        
+        # Create a rectangle for the zoom text area
+        zoom_rect = pygame.Rect(10, 10, zoom_surface.get_width(), zoom_surface.get_height())
+        return zoom_rect.collidepoint(local_mouse_pos.x, local_mouse_pos.y)
+    
+    def is_click_on_camera_text(self, local_mouse_pos):
+        """Check if mouse click is on the camera position text overlay"""
+        font = pygame.font.Font(None, 20)
+        pos_text = f"Camera: ({self.camera.position.x:.1f}, {self.camera.position.y:.1f})"
+        pos_surface = font.render(pos_text, True, Colors.TEXT_COLOR)
+        
+        # Create a rectangle for the camera text area
+        camera_rect = pygame.Rect(10, 30, pos_surface.get_width(), pos_surface.get_height())
+        return camera_rect.collidepoint(local_mouse_pos.x, local_mouse_pos.y)
     
     def update(self, mouse_pos):
         self.hovered = self.rect.collidepoint(mouse_pos)
@@ -296,15 +330,46 @@ class SceneView:
         """Draw UI overlays like zoom level and coordinates"""
         font = pygame.font.Font(None, 20)
         
+        # Get current mouse position for hover detection
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        local_mouse_x = mouse_x - self.rect.x
+        local_mouse_y = mouse_y - self.rect.y
+        
         # Zoom level
         zoom_text = f"Zoom: {self.camera.zoom:.1f}x"
         zoom_surface = font.render(zoom_text, True, Colors.TEXT_COLOR)
+        
+        # Check if hovering over zoom text
+        zoom_rect = pygame.Rect(10, 10, zoom_surface.get_width(), zoom_surface.get_height())
+        zoom_hovered = zoom_rect.collidepoint(local_mouse_x, local_mouse_y)
+        
+        # Draw zoom text with hover effect
+        zoom_color = Colors.ACCENT_COLOR if zoom_hovered else Colors.TEXT_COLOR
+        zoom_surface = font.render(zoom_text, True, zoom_color)
         self.surface.blit(zoom_surface, (10, 10))
+        
+        # Add underline if hovered
+        if zoom_hovered:
+            pygame.draw.line(self.surface, zoom_color, (10, 10 + zoom_surface.get_height()), 
+                           (10 + zoom_surface.get_width(), 10 + zoom_surface.get_height()), 1)
         
         # Camera position
         pos_text = f"Camera: ({self.camera.position.x:.1f}, {self.camera.position.y:.1f})"
         pos_surface = font.render(pos_text, True, Colors.TEXT_COLOR)
+        
+        # Check if hovering over camera text
+        camera_rect = pygame.Rect(10, 30, pos_surface.get_width(), pos_surface.get_height())
+        camera_hovered = camera_rect.collidepoint(local_mouse_x, local_mouse_y)
+        
+        # Draw camera text with hover effect
+        camera_color = Colors.ACCENT_COLOR if camera_hovered else Colors.TEXT_COLOR
+        pos_surface = font.render(pos_text, True, camera_color)
         self.surface.blit(pos_surface, (10, 30))
+        
+        # Add underline if hovered
+        if camera_hovered:
+            pygame.draw.line(self.surface, camera_color, (10, 30 + pos_surface.get_height()), 
+                           (10 + pos_surface.get_width(), 30 + pos_surface.get_height()), 1)
 
 class PygameEditor:
     """Main editor class"""
