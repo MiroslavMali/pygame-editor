@@ -165,6 +165,11 @@ class SceneView:
     def update(self, mouse_pos):
         self.hovered = self.rect.collidepoint(mouse_pos)
         
+        # Check if middle mouse button is still pressed globally
+        # This fixes the issue where releasing MMB outside the scene view doesn't stop panning
+        if self.is_panning and not pygame.mouse.get_pressed()[1]:  # Index 1 is middle mouse button
+            self.is_panning = False
+    
     def draw(self, surface):
         # Clear scene surface
         self.surface.fill(Colors.DARK_GRAY)
