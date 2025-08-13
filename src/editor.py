@@ -95,6 +95,9 @@ class SceneView:
         self.dragged_object = None
         self.drag_start_pos = Vector2(0, 0)
         
+        # Play mode state (will be set by editor)
+        self.is_playing = False
+        
     def handle_event(self, event):
         if not self.hovered:
             return False
@@ -116,13 +119,13 @@ class SceneView:
                     self.camera.reset_view()
                     return True
                 
-                # Object selection and drag start
+                # Object selection and drag start (only in edit mode)
                 world_pos = self.camera.screen_to_world(local_mouse_pos)
                 clicked_object = self.scene.get_object_at_position(world_pos.x, world_pos.y)
                 self.scene.select_object(clicked_object)
                 
-                # Start dragging if we clicked on an object
-                if clicked_object:
+                # Start dragging if we clicked on an object (only in edit mode)
+                if clicked_object and not self.is_playing:
                     self.is_dragging_object = True
                     self.dragged_object = clicked_object
                     self.drag_start_pos = world_pos
@@ -151,8 +154,8 @@ class SceneView:
                 self.camera.pan(delta_x, delta_y)
                 self.last_mouse_pos = local_mouse_pos
                 return True
-            elif self.is_dragging_object and self.dragged_object:
-                # Drag the object
+            elif self.is_dragging_object and self.dragged_object and not self.is_playing:
+                # Drag the object (only in edit mode)
                 world_pos = self.camera.screen_to_world(local_mouse_pos)
                 self.dragged_object.transform.position = world_pos
                 return True
@@ -431,6 +434,10 @@ class PygameEditor:
         self.running = True
         self.object_counter = 1
         
+        # Play mode state
+        self.is_playing = False
+        self.play_speed = 5  # Movement speed for play mode
+        
         # Add some sample objects
         self.create_sample_objects()
         
@@ -464,6 +471,107 @@ class PygameEditor:
         
         # Add plus button to menu bar
         self.add_button = Button(150, 5, 30, 30, "+", self.add_object)
+        
+        # Add play button to menu bar
+        self.play_button = Button(190, 5, 60, 30, "Play", self.toggle_play_mode)
+        
+        # Add code generation button
+        self.code_button = Button(260, 5, 60, 30, "Code", self.show_generated_code)
+        
+    def show_generated_code(self):
+        """Show generated Pygame code in console"""
+        code = self.generate_pygame_code()
+        self.console.log("Generated Pygame Code:")
+        self.console.log("=" * 50)
+        for line in code.split('\n'):
+            if line.strip():
+                self.console.log(line)
+        self.console.log("=" * 50)
+    
+    def toggle_play_mode(self):
+        """Toggle between edit and play mode"""
+        self.is_playing = not self.is_playing
+        if self.is_playing:
+            self.enter_play_mode()
+        else:
+            self.exit_play_mode()
+    
+    def enter_play_mode(self):
+        """Enter play mode"""
+        self.console.log("Entering Play Mode")
+        # Select the first object as default player
+        if self.scene.game_objects:
+            self.scene.select_object(self.scene.game_objects[0])
+    
+    def exit_play_mode(self):
+        """Exit play mode"""
+        self.console.log("Exiting Play Mode")
+        # Deselect all objects
+        self.scene.select_object(None)
+    
+    def generate_pygame_code(self):
+        """Generate Pygame code from current scene"""
+        code = """import pygame
+pygame.init()
+screen = pygame.display.set_mode((800, 600))
+clock = pygame.time.Clock()
+
+# Game objects generated from editor
+"""
+        
+        for i, obj in enumerate(self.scene.game_objects):
+            code += f"""
+# {obj.name}
+{obj.name.lower()}_pos = [{obj.transform.position.x}, {obj.transform.position.y}]
+{obj.name.lower()}_speed = 5
+"""
+        
+        code += """
+# Game loop
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    
+    # Handle input
+    keys = pygame.key.get_pressed()
+"""
+        
+        # Add movement for the first object (player)
+        if self.scene.game_objects:
+            player = self.scene.game_objects[0]
+            code += f"""
+    # Move {player.name}
+    if keys[pygame.K_LEFT]:
+        {player.name.lower()}_pos[0] -= {player.name.lower()}_speed
+    if keys[pygame.K_RIGHT]:
+        {player.name.lower()}_pos[0] += {player.name.lower()}_speed
+    if keys[pygame.K_UP]:
+        {player.name.lower()}_pos[1] -= {player.name.lower()}_speed
+    if keys[pygame.K_DOWN]:
+        {player.name.lower()}_pos[1] += {player.name.lower()}_speed
+"""
+        
+        code += """
+    # Clear screen
+    screen.fill((50, 50, 50))
+    
+    # Draw objects
+"""
+        
+        for obj in self.scene.game_objects:
+            code += f"""    pygame.draw.circle(screen, (255, 0, 0), {obj.name.lower()}_pos, 20)
+"""
+        
+        code += """
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
+"""
+        
+        return code
         
     def create_sample_objects(self):
         """Create some sample objects for testing"""
@@ -517,10 +625,15 @@ class PygameEditor:
                 elif event.key == pygame.K_DELETE:
                     # Delete selected object with Delete key
                     self.delete_object()
+                elif event.key == pygame.K_SPACE and not self.is_playing:
+                    # Toggle play mode with spacebar (only when not playing)
+                    self.toggle_play_mode()
                     
             # Handle UI events
             mouse_pos = pygame.mouse.get_pos()
             self.add_button.handle_event(event)  # Handle add button in menu bar
+            self.play_button.handle_event(event)  # Handle play button in menu bar
+            self.code_button.handle_event(event)  # Handle code button in menu bar
             self.hierarchy_panel.handle_event(event)  # Handle hierarchy clicks
             self.scene_view.handle_event(event)  # Handle scene view clicks
             self.inspector_panel.handle_event(event)
@@ -530,13 +643,37 @@ class PygameEditor:
         """Update editor state"""
         mouse_pos = pygame.mouse.get_pos()
         self.add_button.update(mouse_pos)  # Update add button
+        self.play_button.update(mouse_pos)  # Update play button
+        self.code_button.update(mouse_pos)  # Update code button
         self.hierarchy_panel.update(mouse_pos)
+        
+        # Update scene view with play mode state
+        self.scene_view.is_playing = self.is_playing
         self.scene_view.update(mouse_pos)
+        
         self.inspector_panel.update(mouse_pos)
         self.console_panel.update(mouse_pos)
         
+        # Handle play mode input
+        if self.is_playing:
+            self.handle_play_input()
+        
         # Update scene
         self.scene.update()
+    
+    def handle_play_input(self):
+        """Handle input during play mode"""
+        keys = pygame.key.get_pressed()
+        if self.scene.selected_object:
+            # Move selected object with arrow keys
+            if keys[pygame.K_LEFT]:
+                self.scene.selected_object.transform.position.x -= self.play_speed
+            if keys[pygame.K_RIGHT]:
+                self.scene.selected_object.transform.position.x += self.play_speed
+            if keys[pygame.K_UP]:
+                self.scene.selected_object.transform.position.y -= self.play_speed
+            if keys[pygame.K_DOWN]:
+                self.scene.selected_object.transform.position.y += self.play_speed
         
     def draw(self):
         """Draw the editor"""
@@ -552,8 +689,21 @@ class PygameEditor:
         text = font.render("Pygame Editor", True, Colors.TEXT_COLOR)
         self.screen.blit(text, (10, 10))
         
+        # Update play button text based on mode
+        if self.is_playing:
+            self.play_button.text = "Stop"
+        else:
+            self.play_button.text = "Play"
+        
         # Draw add button in menu bar
         self.add_button.draw(self.screen)
+        self.play_button.draw(self.screen)
+        self.code_button.draw(self.screen)
+        
+        # Draw play mode indicator
+        if self.is_playing:
+            mode_text = font.render("PLAY MODE", True, (255, 255, 0))  # Yellow text
+            self.screen.blit(mode_text, (SCREEN_WIDTH - 150, 10))
         
         # Draw panels
         self.hierarchy_panel.draw(self.screen)
